@@ -7,6 +7,54 @@ void main() {
   runApp(const MyApp());
 }
 
+// Data structure for a level
+class Level {
+  final String name;
+  final double gameSpeed;
+  final List<Color> backgroundColors;
+  final Color groundColor;
+  final Color playerColor;
+  final Color spikeColor;
+
+  const Level({
+    required this.name,
+    required this.gameSpeed,
+    required this.backgroundColors,
+    required this.groundColor,
+    required this.playerColor,
+    required this.spikeColor,
+  });
+}
+
+// List of predefined levels
+final List<Level> levels = [
+  const Level(
+    name: 'Level 1: First Steps',
+    gameSpeed: 0.015,
+    backgroundColors: [Color(0xFF00395B), Color(0xFF002B4A)],
+    groundColor: Color(0xFF001C30),
+    playerColor: Colors.greenAccent,
+    spikeColor: Colors.redAccent,
+  ),
+  const Level(
+    name: 'Level 2: Speedy Spikes',
+    gameSpeed: 0.020,
+    backgroundColors: [Color(0xFF4A003A), Color(0xFF3A002C)],
+    groundColor: Color(0xFF2A001E),
+    playerColor: Colors.yellow,
+    spikeColor: Colors.cyanAccent,
+  ),
+  const Level(
+    name: 'Level 3: The Gauntlet',
+    gameSpeed: 0.025,
+    backgroundColors: [Color(0xFF5A1D00), Color(0xFF4A1000)],
+    groundColor: Color(0xFF3A0A00),
+    playerColor: Colors.orange,
+    spikeColor: Colors.white,
+  ),
+];
+
+
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
@@ -22,6 +70,7 @@ class MyApp extends StatelessWidget {
       initialRoute: '/',
       routes: {
         '/': (context) => const MenuScreen(),
+        '/levels': (context) => const LevelSelectionScreen(),
         '/game': (context) => const GameScreen(),
       },
     );
@@ -101,7 +150,7 @@ class _MenuScreenState extends State<MenuScreen> with SingleTickerProviderStateM
                 scale: _scaleAnimation,
                 child: GestureDetector(
                   onTap: () {
-                    Navigator.pushNamed(context, '/game');
+                    Navigator.pushNamed(context, '/levels');
                   },
                   child: Container(
                     width: 120,
@@ -128,7 +177,7 @@ class _MenuScreenState extends State<MenuScreen> with SingleTickerProviderStateM
               ),
               const SizedBox(height: 20),
               const Text(
-                'TAP TO PLAY',
+                'SELECT LEVEL',
                 style: TextStyle(
                   color: Colors.white,
                   fontSize: 18,
@@ -144,6 +193,69 @@ class _MenuScreenState extends State<MenuScreen> with SingleTickerProviderStateM
   }
 }
 
+class LevelSelectionScreen extends StatelessWidget {
+  const LevelSelectionScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Select Level', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        backgroundColor: Colors.blueGrey[900],
+        iconTheme: const IconThemeData(color: Colors.white),
+      ),
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              Colors.blueGrey[800]!,
+              Colors.blueGrey[900]!,
+            ],
+          ),
+        ),
+        child: ListView.builder(
+          padding: const EdgeInsets.all(8.0),
+          itemCount: levels.length,
+          itemBuilder: (context, index) {
+            final level = levels[index];
+            return Card(
+              margin: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
+              color: level.backgroundColors.first.withOpacity(0.8),
+              elevation: 5,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(15),
+                side: BorderSide(color: level.playerColor, width: 2),
+              ),
+              child: ListTile(
+                contentPadding: const EdgeInsets.symmetric(vertical: 10.0, horizontal: 20.0),
+                title: Text(
+                  level.name,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 18,
+                  ),
+                ),
+                subtitle: Text(
+                  'Speed: ${(level.gameSpeed * 1000).toStringAsFixed(0)}',
+                  style: const TextStyle(color: Colors.white70),
+                ),
+                trailing: Icon(Icons.play_circle_fill, color: level.playerColor, size: 30),
+                onTap: () {
+                  Navigator.pushNamed(context, '/game', arguments: level);
+                },
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
+
 class GameScreen extends StatefulWidget {
   const GameScreen({super.key});
 
@@ -155,7 +267,6 @@ class _GameScreenState extends State<GameScreen> with SingleTickerProviderStateM
   // Game Physics Constants
   static const double gravity = 0.0025; // Gravity pulling down
   static const double jumpStrength = -0.065; // Jump force (negative goes up)
-  static const double gameSpeed = 0.015; // Speed of obstacles moving left
   static const double groundLevel = 0.7; // Y position of the ground (Alignment)
 
   // Player State
@@ -174,10 +285,29 @@ class _GameScreenState extends State<GameScreen> with SingleTickerProviderStateM
   List<List<double>> obstacles = [];
   double timeSinceLastObstacle = 0;
 
+  // Level data
+  late Level currentLevel;
+  bool _levelInitialized = false;
+
   @override
   void initState() {
     super.initState();
     _ticker = createTicker(_onTick);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_levelInitialized) {
+      final level = ModalRoute.of(context)!.settings.arguments as Level?;
+      if (level != null) {
+        currentLevel = level;
+      } else {
+        // Fallback to a default level if no arguments are passed
+        currentLevel = levels[0];
+      }
+      _levelInitialized = true;
+    }
   }
 
   @override
@@ -221,7 +351,7 @@ class _GameScreenState extends State<GameScreen> with SingleTickerProviderStateM
   }
 
   void _onTick(Duration elapsed) {
-    if (!isPlaying || isGameOver) return;
+    if (!isPlaying || isGameOver || !_levelInitialized) return;
 
     setState(() {
       // 1. Apply Gravity
@@ -236,7 +366,7 @@ class _GameScreenState extends State<GameScreen> with SingleTickerProviderStateM
 
       // 3. Move Obstacles
       for (int i = 0; i < obstacles.length; i++) {
-        obstacles[i][0] -= gameSpeed;
+        obstacles[i][0] -= currentLevel.gameSpeed;
       }
 
       // 4. Remove off-screen obstacles
@@ -246,7 +376,7 @@ class _GameScreenState extends State<GameScreen> with SingleTickerProviderStateM
       }
 
       // 5. Spawn new obstacles
-      timeSinceLastObstacle += gameSpeed;
+      timeSinceLastObstacle += currentLevel.gameSpeed;
       // Spawn logic: random gap between 1.0 and 2.5 seconds worth of distance
       if (timeSinceLastObstacle > 0.8 + Random().nextDouble() * 1.2) { 
         obstacles.add([1.5, 0]); // Spawn at right edge
@@ -291,8 +421,13 @@ class _GameScreenState extends State<GameScreen> with SingleTickerProviderStateM
 
   @override
   Widget build(BuildContext context) {
+    // Ensure level is initialized before building
+    if (!_levelInitialized) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+
     return Scaffold(
-      backgroundColor: Colors.blueGrey[900],
+      backgroundColor: currentLevel.backgroundColors.last,
       body: GestureDetector(
         onTapDown: (_) => _jump(), // Use onTapDown for instant response
         child: Stack(
@@ -303,10 +438,7 @@ class _GameScreenState extends State<GameScreen> with SingleTickerProviderStateM
                 gradient: LinearGradient(
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
-                  colors: [
-                    Colors.blueGrey[800]!,
-                    Colors.blueGrey[900]!,
-                  ],
+                  colors: currentLevel.backgroundColors,
                 ),
               ),
             ),
@@ -317,7 +449,7 @@ class _GameScreenState extends State<GameScreen> with SingleTickerProviderStateM
               child: Container(
                 width: double.infinity,
                 height: MediaQuery.of(context).size.height, // Fill rest of screen
-                color: Colors.black,
+                color: currentLevel.groundColor,
               ),
             ),
             Align(
@@ -325,7 +457,7 @@ class _GameScreenState extends State<GameScreen> with SingleTickerProviderStateM
               child: Container(
                 width: double.infinity,
                 height: 4,
-                color: Colors.white,
+                color: currentLevel.playerColor.withOpacity(0.5),
               ),
             ),
 
@@ -338,12 +470,12 @@ class _GameScreenState extends State<GameScreen> with SingleTickerProviderStateM
                   width: 50,
                   height: 50,
                   decoration: BoxDecoration(
-                    color: Colors.yellow,
+                    color: currentLevel.playerColor,
                     borderRadius: BorderRadius.circular(8),
                     border: Border.all(color: Colors.white, width: 3),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.yellow.withOpacity(0.5),
+                        color: currentLevel.playerColor.withOpacity(0.5),
                         blurRadius: 10,
                         spreadRadius: 2,
                       )
@@ -367,11 +499,11 @@ class _GameScreenState extends State<GameScreen> with SingleTickerProviderStateM
             ...obstacles.map((obs) {
               return Align(
                 alignment: Alignment(obs[0], groundLevel),
-                child: Container(
+                child: SizedBox(
                   width: 50,
                   height: 50,
                   child: CustomPaint(
-                    painter: SpikePainter(),
+                    painter: SpikePainter(color: currentLevel.spikeColor),
                   ),
                 ),
               );
@@ -457,7 +589,7 @@ class _GameScreenState extends State<GameScreen> with SingleTickerProviderStateM
                       // Menu Button
                       GestureDetector(
                         onTap: () {
-                          Navigator.of(context).pop();
+                          Navigator.of(context).popUntil((route) => route.isFirst);
                         },
                         child: Container(
                           padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 15),
@@ -488,10 +620,14 @@ class _GameScreenState extends State<GameScreen> with SingleTickerProviderStateM
 }
 
 class SpikePainter extends CustomPainter {
+  final Color color;
+
+  SpikePainter({required this.color});
+
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = Colors.redAccent
+      ..color = color
       ..style = PaintingStyle.fill;
 
     final path = Path();
@@ -504,7 +640,7 @@ class SpikePainter extends CustomPainter {
     canvas.drawPath(path, paint);
     
     final borderPaint = Paint()
-      ..color = Colors.white
+      ..color = Colors.white.withOpacity(0.8)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 3
       ..strokeJoin = StrokeJoin.round;
