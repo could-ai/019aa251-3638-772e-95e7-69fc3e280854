@@ -19,7 +19,127 @@ class MyApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
         useMaterial3: true,
       ),
-      home: const GameScreen(),
+      initialRoute: '/',
+      routes: {
+        '/': (context) => const MenuScreen(),
+        '/game': (context) => const GameScreen(),
+      },
+    );
+  }
+}
+
+class MenuScreen extends StatefulWidget {
+  const MenuScreen({super.key});
+
+  @override
+  State<MenuScreen> createState() => _MenuScreenState();
+}
+
+class _MenuScreenState extends State<MenuScreen> with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _scaleAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      duration: const Duration(milliseconds: 800),
+      vsync: this,
+    )..repeat(reverse: true);
+    
+    _scaleAnimation = Tween<double>(begin: 1.0, end: 1.1).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              Colors.blueGrey[800]!,
+              Colors.blueGrey[900]!,
+            ],
+          ),
+        ),
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              // Title
+              const Text(
+                'GEOMETRY\nDASH',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Colors.greenAccent,
+                  fontSize: 56,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 3,
+                  shadows: [
+                    Shadow(
+                      blurRadius: 15.0,
+                      color: Colors.black,
+                      offset: Offset(4.0, 4.0),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 60),
+              
+              // Play Button with Pulse Animation
+              ScaleTransition(
+                scale: _scaleAnimation,
+                child: GestureDetector(
+                  onTap: () {
+                    Navigator.pushNamed(context, '/game');
+                  },
+                  child: Container(
+                    width: 120,
+                    height: 120,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Colors.yellow,
+                      border: Border.all(color: Colors.white, width: 4),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.yellow.withOpacity(0.5),
+                          blurRadius: 20,
+                          spreadRadius: 5,
+                        )
+                      ],
+                    ),
+                    child: const Icon(
+                      Icons.play_arrow_rounded,
+                      size: 80,
+                      color: Colors.black,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+              const Text(
+                'TAP TO PLAY',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 1.5,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
@@ -140,10 +260,6 @@ class _GameScreenState extends State<GameScreen> with SingleTickerProviderStateM
 
   void _checkCollision() {
     // Player hitbox approximation in Alignment units
-    // Player is 50x50. On a typical screen (width 400), 50px is ~0.25 in alignment width (range 2.0)
-    // Height is similar.
-    
-    // Let's define hitboxes relative to center points
     double playerWidthHalf = 0.12; // Half width in alignment units
     double playerHeightHalf = 0.12; // Half height in alignment units
     
@@ -152,32 +268,9 @@ class _GameScreenState extends State<GameScreen> with SingleTickerProviderStateM
       double obsY = groundLevel; // Spikes sit on ground
       
       // Obstacle hitbox (Spike)
-      // Spike is triangular, but we'll use a smaller rect for forgiveness
       double obsWidthHalf = 0.1;
       double obsHeightHalf = 0.1;
 
-      // Calculate centers
-      // Player center is (playerX, playerY - playerHeightHalf) because player sits ON ground at playerY
-      // Wait, Alignment(0,0) is center of widget.
-      // If I align(playerX, playerY), the center of the 50x50 box is at playerX, playerY.
-      // So if playerY = groundLevel, the center of the box is at groundLevel.
-      // This means half the box is below ground!
-      // I should adjust the visual alignment so the bottom of the box is at playerY.
-      
-      // Actually, let's keep it simple:
-      // playerY is the vertical center of the player.
-      // groundLevel is the vertical center of the ground line? No, groundLevel is a Y coordinate.
-      // If I want player to stand ON ground, and playerY is the center, then ground is at playerY + height/2.
-      
-      // Let's assume playerY tracks the CENTER of the player.
-      // Ground is at `groundLevel + playerHeightHalf`.
-      // But in my code: `if (playerY > groundLevel) playerY = groundLevel;`
-      // This implies playerY stops at groundLevel.
-      // So visually, the player sinks halfway into the floor if I don't offset it.
-      // I will handle this in the build method with a transform or margin, OR just accept it for the logic.
-      
-      // Let's check overlap of two rectangles defined by centers (playerX, playerY) and (obsX, obsY)
-      
       double dx = (playerX - obsX).abs();
       double dy = (playerY - obsY).abs();
       
@@ -198,10 +291,6 @@ class _GameScreenState extends State<GameScreen> with SingleTickerProviderStateM
 
   @override
   Widget build(BuildContext context) {
-    // Adjust visual position so player sits ON TOP of the logical Y position if Y represents the ground contact point?
-    // No, let's stick to: playerY is the center of the player.
-    // Ground is drawn at groundLevel + offset.
-    
     return Scaffold(
       backgroundColor: Colors.blueGrey[900],
       body: GestureDetector(
@@ -223,10 +312,6 @@ class _GameScreenState extends State<GameScreen> with SingleTickerProviderStateM
             ),
             
             // Ground
-            // We draw the ground slightly below the player's lowest point
-            // Player center is at groundLevel. Player height is ~50px.
-            // So ground should be at groundLevel + (50px in alignment units).
-            // 50px is approx 0.15 height units.
             Align(
               alignment: Alignment(0, groundLevel + 0.15), 
               child: Container(
@@ -326,7 +411,7 @@ class _GameScreenState extends State<GameScreen> with SingleTickerProviderStateM
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(
-                        isGameOver ? 'GAME OVER' : 'GEOMETRY\nDASH',
+                        isGameOver ? 'GAME OVER' : 'READY?',
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           color: isGameOver ? Colors.redAccent : Colors.greenAccent,
@@ -343,25 +428,51 @@ class _GameScreenState extends State<GameScreen> with SingleTickerProviderStateM
                         ),
                       ),
                       const SizedBox(height: 30),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 15),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(30),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.white.withOpacity(0.3),
-                              blurRadius: 15,
-                              spreadRadius: 5,
-                            )
-                          ],
+                      GestureDetector(
+                        onTap: _startGame,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 15),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(30),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.white.withOpacity(0.3),
+                                blurRadius: 15,
+                                spreadRadius: 5,
+                              )
+                            ],
+                          ),
+                          child: Text(
+                            isGameOver ? 'RESTART' : 'START',
+                            style: const TextStyle(
+                              color: Colors.black,
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
                         ),
-                        child: Text(
-                          isGameOver ? 'TAP TO RESTART' : 'TAP TO START',
-                          style: const TextStyle(
-                            color: Colors.black,
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
+                      ),
+                      const SizedBox(height: 20),
+                      // Menu Button
+                      GestureDetector(
+                        onTap: () {
+                          Navigator.of(context).pop();
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 15),
+                          decoration: BoxDecoration(
+                            color: Colors.blueGrey,
+                            borderRadius: BorderRadius.circular(30),
+                            border: Border.all(color: Colors.white, width: 2),
+                          ),
+                          child: const Text(
+                            'MENU',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                         ),
                       ),
